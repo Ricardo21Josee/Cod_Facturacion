@@ -31,11 +31,6 @@ struct Factura {
     string nitEmpresa;
     Cliente cliente;
     vector<Producto> productos;
-    double siva = 0;
-    double subtotal = 0;
-    double iva = 0;
-    double total = 0;
-    bool requiereNIT = false;
 };
 
 // Datos de la empresa
@@ -69,51 +64,31 @@ void limpiarPantalla() {
 #endif
 }
 
-void guardarDatos() {
-    json j;
-    j["productos"] = json::array();
-    for (const auto& producto : productosDisponibles) {
-        j["productos"].push_back({
-            {"nombre", producto.nombre},
-            {"descripcion", producto.descripcion},
-            {"precio", producto.precio},
-            {"cantidad", producto.cantidad},
-            {"existencia", producto.existencia}
-            });
-    }
+// Conexión a la base de datos
+connection conectarDB() {
+    try {
+        string conn_str =
+            "host=" + DB_HOST + " "
+            "port=" + DB_PORT + " "
+            "dbname=" + DB_NAME + " "
+            "user=" + DB_USER + " "
+            "password=" + DB_PASSWORD;
 
-    j["facturas"] = json::array();
-    for (const auto& factura : facturas) {
-        json jFactura;
-        jFactura["codigo"] = factura.codigo;
-        jFactura["nombreEmpresa"] = factura.nombreEmpresa;
-        jFactura["direccionEmpresa"] = factura.direccionEmpresa;
-        jFactura["nitEmpresa"] = factura.nitEmpresa;
-        jFactura["cliente"] = {
-            {"nombre", factura.cliente.nombre},
-            {"nit", factura.cliente.nit}
-        };
-        jFactura["productos"] = json::array();
-        for (const auto& producto : factura.productos) {
-            jFactura["productos"].push_back({
-                {"nombre", producto.nombre},
-                {"descripcion", producto.descripcion},
-                {"precio", producto.precio},
-                {"cantidad", producto.cantidad},
-                {"existencia", producto.existencia}
-                });
+        connection C(conn_str);
+        if (C.is_open()) {
+            cout << "Conexión exitosa a PostgreSQL" << endl;
+            return C;
         }
-        jFactura["siva"] = factura.siva;
-        jFactura["subtotal"] = factura.subtotal;
-        jFactura["iva"] = factura.iva;
-        jFactura["total"] = factura.total;
-        jFactura["requiereNIT"] = factura.requiereNIT;
-        j["facturas"].push_back(jFactura);
+        throw runtime_error("No se pudo conectar a la base de datos");
     }
-
-    ofstream file("datos.json");
-    file << j.dump(4);
-    file.close();
+    catch (const exception& e) {
+        cerr << "Error de conexión: " << e.what() << endl;
+        cerr << "Verifique:\n"
+            << "1. Servicio PostgreSQL activo\n"
+            << "2. Credenciales correctas\n"
+            << "3. Usuario tenga permisos\n"
+            << "4. Firewall permite conexiones al puerto 5432" << endl;
+        exit(1);
 }
 
 void cargarDatos() {
@@ -126,78 +101,69 @@ void cargarDatos() {
         return;
     }
 
-    json j;
-    file >> j;
-    file.close();
+// Obtener inventario completo desde la base de datos
+vector<Producto> obtenerInventario(connection& C) {
+    vector<Producto> inventario;
+    try {
+        work W(C);
+        result R = W.exec("SELECT id, nombre, descripcion, precio, existencia FROM productos_inventario ORDER BY nombre");
 
-    productosDisponibles.clear();
-    for (const auto& item : j["productos"]) {
-        Producto producto;
-        producto.nombre = item["nombre"];
-        producto.descripcion = item["descripcion"];
-        producto.precio = item["precio"];
-        producto.cantidad = item["cantidad"];
-        producto.existencia = item["existencia"];
-        productosDisponibles.push_back(producto);
+        for (auto row : R) {
+            Producto p;
+            p.id = row[0].as<int>();
+            p.nombre = row[1].as<string>();
+            p.descripcion = row[2].as<string>();
+            p.precio = row[3].as<double>();
+            p.existencia = row[4].as<int>();
+            inventario.push_back(p);
     }
-
-    facturas.clear();
-    for (const auto& item : j["facturas"]) {
-        Factura factura;
-        factura.codigo = item["codigo"];
-        factura.nombreEmpresa = item["nombreEmpresa"];
-        factura.direccionEmpresa = item["direccionEmpresa"];
-        factura.nitEmpresa = item["nitEmpresa"];
-        factura.cliente.nombre = item["cliente"]["nombre"];
-        factura.cliente.nit = item["cliente"]["nit"];
-        for (const auto& prod : item["productos"]) {
-            Producto producto;
-            producto.nombre = prod["nombre"];
-            producto.descripcion = prod["descripcion"];
-            producto.precio = prod["precio"];
-            producto.cantidad = prod["cantidad"];
-            producto.existencia = prod["existencia"];
-            factura.productos.push_back(producto);
+        W.commit();
         }
-        factura.siva = item["siva"];
-        factura.subtotal = item["subtotal"];
-        factura.iva = item["iva"];
-        factura.total = item["total"];
-        factura.requiereNIT = item["requiereNIT"];
-        facturas.push_back(factura);
+    catch (const exception& e) {
+        cerr << "Error al obtener inventario: " << e.what() << endl;
+    }
+    return inventario;
+}
+
+// Obtener un producto específico por ID
+Producto obtenerProductoPorId(connection& C, int id) {
+    try {
+        work W(C);
+        result R = W.exec("SELECT id, nombre, descripcion, precio, existencia FROM productos_inventario WHERE id = " + to_string(id));
+
+        if (R.empty()) {
+            throw runtime_error("Producto no encontrado");
+    }
+
+        Producto p;
+        auto row = R[0];
+        p.id = row[0].as<int>();
+        p.nombre = row[1].as<string>();
+        p.descripcion = row[2].as<string>();
+        p.precio = row[3].as<double>();
+        p.existencia = row[4].as<int>();
+
+        W.commit();
+        return p;
+}
+    catch (const exception& e) {
+        cerr << "Error al obtener producto: " << e.what() << endl;
+        throw;
     }
 }
 
-void mostrarProductosDisponibles() {
-    cout << "\n=== PRODUCTOS DISPONIBLES ===" << endl;
-    cout << setw(5) << left << "ID"
-        << setw(20) << left << "Nombre"
-        << setw(50) << left << "Descripcion"
-        << setw(10) << left << "Precio"
-        << setw(10) << left << "Existencia" << endl;
-
-    for (size_t i = 0; i < productosDisponibles.size(); i++) {
-        cout << setw(5) << left << i + 1
-            << setw(20) << left << productosDisponibles[i].nombre
-            << setw(50) << left << productosDisponibles[i].descripcion
-            << setw(10) << left << productosDisponibles[i].precio
-            << setw(10) << left << productosDisponibles[i].existencia << endl;
+// Actualizar existencias en la base de datos
+bool actualizarExistencias(connection& C, int producto_id, int nueva_existencia) {
+    try {
+        work W(C);
+        W.exec("UPDATE productos_inventario SET existencia = " + to_string(nueva_existencia) +
+            " WHERE id = " + to_string(producto_id));
+        W.commit();
+        return true;
     }
-}
-
-void mostrarFactura(const Factura& factura) {
-    cout << "\n\n=== " << factura.nombreEmpresa << " ===" << endl;
-    cout << "Direccion: " << factura.direccionEmpresa << endl;
-    cout << "NIT: " << factura.nitEmpresa << endl;
-    cout << "Codigo de Factura: " << factura.codigo << endl;
-    cout << "----------------------------------------" << endl;
-    cout << "Datos del cliente:" << endl;
-    cout << "Nombre: " << factura.cliente.nombre << endl;
-    if (factura.requiereNIT) {
-        cout << "NIT: " << factura.cliente.nit << endl;
-    }
-    else {
-        cout << "Factura CF (Consumidor Final)" << endl;
+    catch (const exception& e) {
+        cerr << "Error al actualizar existencias: " << e.what() << endl;
+        return false;
     }
     cout << "----------------------------------------" << endl;
     cout << "Productos:" << endl;
@@ -208,83 +174,106 @@ void mostrarFactura(const Factura& factura) {
             << setw(10) << producto.cantidad
             << setw(10) << producto.precio * producto.cantidad << endl;
     }
-    cout << "----------------------------------------" << endl;
-    cout << setw(40) << left << "Subtotal:" << setw(10) << factura.subtotal << endl;
-    cout << "----------------------------------------" << endl;
-    cout << setw(40) << left << "Subtotal sin IVA:" << setw(10) << factura.siva << endl;
-    cout << setw(40) << left << "IVA (12%):" << setw(10) << factura.iva << endl;
-    cout << setw(40) << left << "Total a pagar:" << setw(10) << factura.total << endl;
-    cout << "========================================" << endl;
+
+// Reducir existencias cuando se vende un producto
+bool reducirExistencias(connection& C, int producto_id, int cantidad) {
+    try {
+        work W(C);
+
+        // Verificar que haya suficiente existencia primero
+        result R = W.exec("SELECT existencia FROM productos_inventario WHERE id = " + to_string(producto_id));
+        if (R.empty()) {
+            throw runtime_error("Producto no encontrado");
 }
 
-void calcularTotales(Factura& factura) {
-    factura.subtotal = 0;
-    for (const auto& producto : factura.productos) {
-        factura.subtotal += producto.precio * producto.cantidad;
+        int existencia_actual = R[0][0].as<int>();
+        if (existencia_actual < cantidad) {
+            throw runtime_error("No hay suficiente existencia");
     }
-    factura.siva = factura.subtotal / 1.12;
-    factura.iva = factura.siva * 0.12;
-    factura.total = factura.siva + factura.iva;
-    factura.requiereNIT = (factura.total > 2499);
+
+        W.exec("UPDATE productos_inventario SET existencia = existencia - " + to_string(cantidad) +
+            " WHERE id = " + to_string(producto_id));
+        W.commit();
+        return true;
+}
+    catch (const exception& e) {
+        cerr << "Error al reducir existencias: " << e.what() << endl;
+        return false;
+    }
 }
 
-void devolverProductosAlInventario(Factura& factura) {
-    for (auto& productoFactura : factura.productos) {
-        for (auto& productoInventario : productosDisponibles) {
-            if (productoFactura.nombre == productoInventario.nombre) {
-                productoInventario.existencia += productoFactura.cantidad;
-                break;
+// Agregar nuevo producto al inventario
+bool agregarProducto(connection& C, const Producto& p) {
+    try {
+        work W(C);
+        string query = "INSERT INTO productos_inventario (nombre, descripcion, precio, existencia) VALUES (" +
+            W.quote(p.nombre) + ", " + W.quote(p.descripcion) + ", " +
+            to_string(p.precio) + ", " + to_string(p.existencia) + ")";
+        W.exec(query);
+        W.commit();
+        return true;
             }
+    catch (const exception& e) {
+        cerr << "Error al agregar producto: " << e.what() << endl;
+        return false;
+    }
         }
+
+// Mostrar el inventario actual
+void mostrarInventario(const vector<Producto>& inventario) {
+    cout << "\n=== INVENTARIO ACTUAL ===" << endl;
+    cout << setw(5) << left << "ID"
+        << setw(25) << left << "Nombre"
+        << setw(10) << right << "Precio"
+        << setw(10) << right << "Existencia" << endl;
+    cout << string(50, '-') << endl;
+
+    for (const auto& p : inventario) {
+        cout << setw(5) << left << p.id
+            << setw(25) << left << p.nombre
+            << setw(10) << right << fixed << setprecision(2) << p.precio
+            << setw(10) << right << p.existencia << endl;
     }
 }
 
-void menuFacturacion(Factura& factura) {
+// Menú para gestionar el inventario
+void menuInventario(connection& C) {
     int opcion;
     do {
         limpiarPantalla();
-        mostrarFactura(factura);
-        cout << "\n=== OPCIONES DE FACTURACION ===" << endl;
-        cout << "1. Agregar otro producto" << endl;
-        cout << "2. Eliminar un producto" << endl;
-        cout << "3. Emitir factura" << endl;
-        cout << "4. Cancelar factura" << endl;
-        cout << "Seleccione una opcion: ";
+        cout << "=== GESTIÓN DE INVENTARIO ===" << endl;
+        cout << "1. Ver inventario completo" << endl;
+        cout << "2. Buscar producto por ID" << endl;
+        cout << "3. Agregar nuevo producto" << endl;
+        cout << "4. Actualizar existencias" << endl;
+        cout << "5. Volver al menú principal" << endl;
+        cout << "Seleccione una opción: ";
         cin >> opcion;
         cin.ignore();
 
         switch (opcion) {
         case 1: {
-            limpiarPantalla();
-            mostrarProductosDisponibles();
-            int idProducto, cantidad;
-            cout << " " << endl;
-            cout << "------------------------------------------------" << endl;
-            cout << "Ingrese el ID del producto que desea agregar: ";
-            cin >> idProducto;
-            cout << "------------------------------------------------" << endl;
-            cout << "Ingrese la cantidad: ";
-            cin >> cantidad;
-
-            if (idProducto < 1 || idProducto > productosDisponibles.size()) {
-                cout << "------------------------------------------------" << endl;
-                cout << "ID de producto no valido. Intente de nuevo." << endl;
+            auto inventario = obtenerInventario(C);
+            mostrarInventario(inventario);
                 break;
             }
+        case 2: {
+            int id;
+            cout << "Ingrese el ID del producto: ";
+            cin >> id;
+            cin.ignore();
 
-            if (cantidad > productosDisponibles[idProducto - 1].existencia) {
-                cout << "------------------------------------------------" << endl;
-                cout << "No hay suficiente existencia. Intente de nuevo." << endl;
-                break;
+            try {
+                Producto p = obtenerProductoPorId(C, id);
+                cout << "\nDetalles del producto:" << endl;
+                cout << "ID: " << p.id << endl;
+                cout << "Nombre: " << p.nombre << endl;
+                cout << "Descripción: " << p.descripcion << endl;
+                cout << "Precio: " << fixed << setprecision(2) << p.precio << endl;
+                cout << "Existencia: " << p.existencia << endl;
             }
-
-            Producto productoSeleccionado = productosDisponibles[idProducto - 1];
-            productoSeleccionado.cantidad = cantidad;
-            factura.productos.push_back(productoSeleccionado);
-
-            productosDisponibles[idProducto - 1].existencia -= cantidad;
-            calcularTotales(factura);
-            break;
+            catch (const exception& e) {
+                cerr << "Error: " << e.what() << endl;
         }
         case 2: {
             if (factura.productos.empty()) {
@@ -292,23 +281,39 @@ void menuFacturacion(Factura& factura) {
                 cout << "No hay productos para eliminar." << endl;
                 break;
             }
-            cout << "------------------------------------------------" << endl;
-            cout << "Ingrese el numero del producto que desea eliminar: ";
-            int idEliminar;
-            cin >> idEliminar;
+        case 3: {
+            Producto nuevo;
+            cout << "Nombre del producto: ";
+            getline(cin, nuevo.nombre);
+            cout << "Descripción: ";
+            getline(cin, nuevo.descripcion);
+            cout << "Precio: ";
+            cin >> nuevo.precio;
+            cout << "Existencia inicial: ";
+            cin >> nuevo.existencia;
+            cin.ignore();
 
-            if (idEliminar < 1 || idEliminar > factura.productos.size()) {
-                cout << "------------------------------------------------" << endl;
-                cout << "Numero de producto no valido." << endl;
+            if (agregarProducto(C, nuevo)) {
+                cout << "Producto agregado exitosamente!" << endl;
+            }
+            else {
+                cout << "Error al agregar el producto" << endl;
+            }
                 break;
             }
+        case 4: {
+            int id, nueva_existencia;
+            cout << "ID del producto a actualizar: ";
+            cin >> id;
+            cout << "Nueva cantidad en existencia: ";
+            cin >> nueva_existencia;
+            cin.ignore();
 
-            // Devolver el producto al inventario
-            for (auto& productoInventario : productosDisponibles) {
-                if (productoInventario.nombre == factura.productos[idEliminar - 1].nombre) {
-                    productoInventario.existencia += factura.productos[idEliminar - 1].cantidad;
-                    break;
+            if (actualizarExistencias(C, id, nueva_existencia)) {
+                cout << "Existencias actualizadas correctamente!" << endl;
                 }
+            else {
+                cout << "Error al actualizar existencias" << endl;
             }
 
             // Eliminar el producto de la factura
@@ -332,73 +337,67 @@ void menuFacturacion(Factura& factura) {
             return;
         }
         default:
-            cout << "-----------------------------------" << endl;
-            cout << "Opcion no valida. Intente de nuevo." << endl;
-            cout << " " << endl;
+            cout << "Opción no válida!" << endl;
         }
-        cout << "-------------------------------" << endl;
-        cout << "Presione Enter para continuar...";
-        cin.get();
+
+        cout << "\nPresione Enter para continuar...";
+        cin.ignore();
     } while (true);
 }
 
-void emitirFactura() {
+// Función para emitir una nueva factura
+void emitirFactura(connection& C) {
+    limpiarPantalla();
+    auto inventario = obtenerInventario(C);
+
     Factura factura;
     factura.nombreEmpresa = NOMBRE_EMPRESA;
     factura.direccionEmpresa = DIRECCION_EMPRESA;
     factura.nitEmpresa = NIT_EMPRESA;
+    factura.cliente_id = 0;
+    factura.cf_cliente_id = 0;
 
-    cout << " " << endl;
-    cout << "-------------------------------------------" << endl;
-    cout << "Ingrese el nombre del cliente: ";
-    getline(cin, factura.cliente.nombre);
+    // Selección de cliente (simplificado para el ejemplo)
+    cout << "=== DATOS DEL CLIENTE ===" << endl;
+    cout << "Nombre del cliente: ";
+    string nombreCliente;
+    getline(cin, nombreCliente);
 
+    cout << "NIT (deje en blanco para consumidor final): ";
+    string nit;
+    getline(cin, nit);
+
+    factura.requiere_nit = !nit.empty();
+
+    // Selección de productos
     char continuar;
     do {
         limpiarPantalla();
-        mostrarProductosDisponibles();
+        mostrarInventario(inventario);
 
-        int idProducto, cantidad;
-        cout << " " << endl;
-        cout << "-------------------------------------------" << endl;
-        cout << "Ingrese el ID del producto que desea comprar: ";
-        cin >> idProducto;
-        cout << "-------------------------------------------" << endl;
-        cout << "Ingrese la cantidad: ";
+        int producto_id, cantidad;
+        cout << "\nID del producto a facturar (0 para terminar): ";
+        cin >> producto_id;
+
+        if (producto_id == 0) break;
+
+        cout << "Cantidad: ";
         cin >> cantidad;
 
-        if (idProducto < 1 || idProducto > productosDisponibles.size()) {
-            cout << "-------------------------------------------" << endl;
-            cout << "ID de producto no valido. Intente de nuevo." << endl;
+        try {
+            Producto p = obtenerProductoPorId(C, producto_id);
+
+            if (p.existencia < cantidad) {
+                cout << "No hay suficiente existencia. Disponible: " << p.existencia << endl;
             continue;
         }
 
-        if (cantidad > productosDisponibles[idProducto - 1].existencia) {
-            cout << "-----------------------------------------------" << endl;
-            cout << "No hay suficiente existencia. Intente de nuevo." << endl;
-            continue;
-        }
+            p.existencia = cantidad;
+            factura.productos.push_back(p);
 
-        Producto productoSeleccionado = productosDisponibles[idProducto - 1];
-        productoSeleccionado.cantidad = cantidad;
-        factura.productos.push_back(productoSeleccionado);
-
-        productosDisponibles[idProducto - 1].existencia -= cantidad;
-
-        cout << "-------------------------------------------" << endl;
-        cout << "Desea agregar otro producto? (s/n): ";
-        cin >> continuar;
-        cin.ignore();
-    } while (continuar == 's' || continuar == 'S');
-
-    calcularTotales(factura);
-
-    if (factura.total > 2499) {
-        cout << "---------------------------------------------------------" << endl;
-        cout << "El monto total excede Q2499. Se requiere NIT del cliente." << endl;
-        cout << "Ingrese el NIT del cliente: ";
-        getline(cin, factura.cliente.nit);
-        factura.requiereNIT = true;
+            // Reducir existencias en la base de datos
+            if (reducirExistencias(C, producto_id, cantidad)) {
+                cout << "Producto agregado a la factura" << endl;
     }
     else {
         // Preguntar si desea agregar NIT para facturas menores a 2499
@@ -420,20 +419,17 @@ void emitirFactura() {
             factura.cliente.nit = "CF";
             factura.requiereNIT = false;
         }
+        catch (const exception& e) {
+            cerr << "Error: " << e.what() << endl;
     }
 
-    limpiarPantalla();
-    menuFacturacion(factura);
-}
+        cout << "\nDesea agregar otro producto? (s/n): ";
+        cin >> continuar;
+        cin.ignore();
+    } while (continuar == 's' || continuar == 'S');
 
-void buscarFactura() {
-    string codigo;
-    cout << "Ingrese el codigo de la factura: ";
-    getline(cin, codigo);
-
-    for (const auto& factura : facturas) {
-        if (factura.codigo == codigo) {
-            mostrarFactura(factura);
+    if (factura.productos.empty()) {
+        cout << "Factura vacía, no se puede emitir" << endl;
             return;
         }
     }
@@ -441,130 +437,97 @@ void buscarFactura() {
     cout << "Factura no encontrada." << endl;
 }
 
-void mostrarTodasFacturas() {
-    int opcion;
-    cout << "\n=== ORDENAR FACTURAS POR ===" << endl;
-    cout << "1. Codigo de factura" << endl;
-    cout << "2. Nombre del cliente" << endl;
-    cout << "3. Total de la factura" << endl;
-    cout << "Seleccione una opcion: ";
-    cin >> opcion;
-    cin.ignore();
-
-    switch (opcion) {
-    case 1:
-        sort(facturas.begin(), facturas.end(), compararPorCodigo);
-        break;
-    case 2:
-        sort(facturas.begin(), facturas.end(), compararPorNombreCliente);
-        break;
-    case 3:
-        sort(facturas.begin(), facturas.end(), compararPorTotal);
-        break;
-    default:
-        cout << "Opcion no valida. Mostrando sin ordenar." << endl;
-        break;
+    // Calcular totales
+    factura.subtotal = 0;
+    for (const auto& p : factura.productos) {
+        factura.subtotal += p.precio * p.existencia;
     }
+    factura.subtotal_sin_iva = factura.subtotal / 1.12;
+    factura.iva = factura.subtotal_sin_iva * 0.12;
+    factura.total = factura.subtotal;
 
-    for (const auto& factura : facturas) {
-        mostrarFactura(factura);
-    }
-}
+    // Generar código de factura
+    factura.codigo = "FAC-" + to_string(time(nullptr));
 
-void mostrarEstadoCuenta() {
-    double totalVentas = 0;
-    cout << " " << endl;
-    cout << "-------------------------------------------" << endl;
-    cout << "=== ESTADO DE CUENTA ===" << endl;
-    for (const auto& factura : facturas) {
-        totalVentas += factura.total;
-        cout << "Factura: " << factura.codigo << " - Total: Q" << factura.total << endl;
-    }
-    cout << "Total de ventas: Q" << totalVentas << endl;
-}
-
-void agregarProducto() {
+    // Mostrar resumen
     limpiarPantalla();
-    Producto nuevoProducto;
-
-    cout << "=== AGREGAR NUEVO PRODUCTO ===" << endl;
-    cout << "Ingrese los siguientes datos:" << endl;
-
-    cout << "Nombre: ";
-    getline(cin, nuevoProducto.nombre);
-
-    cout << "Descripcion: ";
-    getline(cin, nuevoProducto.descripcion);
-
-    cout << "Precio: ";
-    cin >> nuevoProducto.precio;
-
-    cout << "Existencia inicial: ";
-    cin >> nuevoProducto.existencia;
-    cin.ignore(); // Limpiar el buffer de entrada
-
-    // Inicializar cantidad en 0
-    nuevoProducto.cantidad = 0;
-
-    // Agregar el producto al vector
-    productosDisponibles.push_back(nuevoProducto);
-
-    // Guardar los cambios en el archivo JSON
-    guardarDatos();
-
-    cout << "\nProducto agregado exitosamente!" << endl;
+    cout << "\n=== RESUMEN DE FACTURA ===" << endl;
+    cout << "Cliente: " << nombreCliente << endl;
+    if (factura.requiere_nit) {
+        cout << "NIT: " << nit << endl;
+    }
+    else {
+        cout << "Consumidor Final" << endl;
 }
 
-void menu() {
-    cargarDatos(); // Cargar datos al iniciar el programa
+    cout << "\nProductos:" << endl;
+    cout << setw(25) << left << "Nombre"
+        << setw(10) << right << "Cantidad"
+        << setw(15) << right << "Precio"
+        << setw(15) << right << "Subtotal" << endl;
+    cout << string(65, '-') << endl;
 
+    for (const auto& p : factura.productos) {
+        cout << setw(25) << left << p.nombre
+            << setw(10) << right << p.existencia
+            << setw(15) << right << fixed << setprecision(2) << p.precio
+            << setw(15) << right << (p.precio * p.existencia) << endl;
+    }
+
+    cout << string(65, '-') << endl;
+    cout << setw(50) << right << "Subtotal sin IVA: " << fixed << setprecision(2) << factura.subtotal_sin_iva << endl;
+    cout << setw(50) << right << "IVA (12%): " << fixed << setprecision(2) << factura.iva << endl;
+    cout << setw(50) << right << "TOTAL: " << fixed << setprecision(2) << factura.total << endl;
+
+    // Aquí deberías implementar la inserción en las tablas facturas y pre_detalle_factura
+    cout << "\nFactura generada con código: " << factura.codigo << endl;
+}
+
+// Menú principal
+void menuPrincipal(connection& C) {
     int opcion;
     do {
         limpiarPantalla();
-        cout << "=== MENU PRINCIPAL ===" << endl;
-        cout << "1. Emitir Factura" << endl;
-        cout << "2. Buscar Factura" << endl;
-        cout << "3. Mostrar Todas las Facturas" << endl;
-        cout << "4. Mostrar Estado de Cuenta" << endl;
-        cout << "5. Mostrar Inventario" << endl;
-        cout << "6. Agregar productos al inventario" << endl;
-        cout << "7. Salir" << endl;
-        cout << "Seleccione una opcion: ";
+        cout << "=== SISTEMA DE FACTURACIÓN ===" << endl;
+        cout << "1. Gestión de Inventario" << endl;
+        cout << "2. Emitir Factura" << endl;
+        cout << "3. Salir" << endl;
+        cout << "Seleccione una opción: ";
         cin >> opcion;
         cin.ignore();
 
         switch (opcion) {
         case 1:
-            emitirFactura();
+            menuInventario(C);
             break;
         case 2:
-            buscarFactura();
+            emitirFactura(C);
             break;
         case 3:
-            mostrarTodasFacturas();
-            break;
-        case 4:
-            mostrarEstadoCuenta();
-            break;
-        case 5:
-            mostrarProductosDisponibles();
-            break;
-        case 6:
-            agregarProducto();
-            break;
-        case 7:
-            guardarDatos(); // Guardar datos antes de salir
-            cout << "Saliendo..." << endl;
-            break;
+            cout << "Saliendo del sistema..." << endl;
+            return;
         default:
             cout << "Opcion no valida. Intente de nuevo." << endl;
         }
-        cout << "Presione Enter para continuar...";
-        cin.get();
-    } while (opcion != 7);
+
+        cout << "\nPresione Enter para continuar...";
+        cin.ignore();
+    } while (true);
 }
 
 int main() {
-    menu();
+    configurarConsola();
+
+    try {
+        connection C = conectarDB();
+        menuPrincipal(C);
+    }
+    catch (const exception& e) {
+        cerr << "Error fatal: " << e.what() << endl;
+    }
+
+#ifdef _WIN32
+    system("pause");
+#endif
     return 0;
 }
