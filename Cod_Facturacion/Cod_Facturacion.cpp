@@ -1,62 +1,93 @@
+// Definiciones para suprimir warnings comunes
+#define _CRT_SECURE_NO_WARNINGS
+#define _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
+#define _SILENCE_CXX17_STRSTREAM_DEPRECATION_WARNING
+
+// Inclusión de pqxx con supresión de warnings específicos
+#pragma warning(push)
+#pragma warning(disable: 5030)  // Para el warning [[assume]]
+#include <pqxx/pqxx>
+#pragma warning(pop)
+
+// Resto de includes
 #include <iostream>
 #include <vector>
 #include <iomanip>
 #include <string>
 #include <algorithm>
-#include <cstdlib> // Para system("cls") o system("clear")
-#include <fstream> // Para manejo de archivos
-#include "json.hpp"
+#include <ctime>
+#include <stdexcept>
+#include <cstdlib>
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
 using namespace std;
-using json = nlohmann::json;
+using namespace pqxx;
 
-// Estructuras de datos
+// Estructuras de datos actualizadas según las tablas
 struct Producto {
-    string nombre;
-    string descripcion;
-    double precio = 0;
-    int cantidad = 0;
+    int id = 0;
+    string nombre = "";
+    string descripcion = "";
+    double precio = 0.0;
     int existencia = 0;
 };
 
 struct Cliente {
-    string nombre;
-    string nit;
+    int id = 0;
+    string nombre = "";
+    string apellido = "";
+    string direccion = "";
+    string dpi = "";
+    string nit = "";
+};
+
+struct ClienteCF {
+    int id = 0;
+    string nombre = "";
+    string direccion = "";
 };
 
 struct Factura {
-    string codigo;
-    string nombreEmpresa;
-    string direccionEmpresa;
-    string nitEmpresa;
-    Cliente cliente;
+    int id = 0;
+    string codigo = "";
+    string nombreEmpresa = "";
+    string direccionEmpresa = "";
+    string nitEmpresa = "";
+    int cliente_id = 0;
+    int cf_cliente_id = 0;
+    double subtotal_sin_iva = 0.0;
+    double subtotal = 0.0;
+    double iva = 0.0;
+    double total = 0.0;
+    bool requiere_nit = false;
     vector<Producto> productos;
 };
+
+// Configuración de la base de datos
+const string DB_NAME = "Tienda_Facturacion_DB";
+const string DB_USER = "ricardo";
+const string DB_PASSWORD = "ricgio921";
+const string DB_HOST = "localhost";
+const string DB_PORT = "5432";
 
 // Datos de la empresa
 const string NOMBRE_EMPRESA = "TecnoShop GT";
 const string DIRECCION_EMPRESA = "12 Calle 1-25 Zona 10, Ciudad de Guatemala";
 const string NIT_EMPRESA = "123456-7";
 
-// Vectores globales para almacenar datos
-vector<Producto> productosDisponibles;
-vector<Factura> facturas;
-
-// Funciones de comparación para ordenar facturas
-bool compararPorCodigo(const Factura& a, const Factura& b) {
-    return a.codigo < b.codigo;
+// Configuración de consola
+void configurarConsola() noexcept {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+    system("cls");
+#endif
 }
 
-bool compararPorNombreCliente(const Factura& a, const Factura& b) {
-    return a.cliente.nombre < b.cliente.nombre;
-}
-
-bool compararPorTotal(const Factura& a, const Factura& b) {
-    return a.total < b.total;
-}
-
-// Funciones
-void limpiarPantalla() {
+// Función para limpiar la pantalla
+void limpiarPantalla() noexcept {
 #ifdef _WIN32
     system("cls");
 #else
@@ -64,7 +95,7 @@ void limpiarPantalla() {
 #endif
 }
 
-// ConexiÃ³n a la base de datos
+// Conexión a la base de datos
 connection conectarDB() {
     try {
         string conn_str =
@@ -76,37 +107,56 @@ connection conectarDB() {
 
         connection C(conn_str);
         if (C.is_open()) {
-            cout << "ConexiÃ³n exitosa a PostgreSQL" << endl;
+            cout << "Conexión exitosa a PostgreSQL" << endl;
             return C;
         }
         throw runtime_error("No se pudo conectar a la base de datos");
     }
     catch (const exception& e) {
-        cerr << "Error de conexiÃ³n: " << e.what() << endl;
+        cerr << "Error de conexion: " << e.what() << endl;
         cerr << "Verifique:\n"
             << "1. Servicio PostgreSQL activo\n"
             << "2. Credenciales correctas\n"
             << "3. Usuario tenga permisos\n"
             << "4. Firewall permite conexiones al puerto 5432" << endl;
         exit(1);
+    }
 }
 
-void cargarDatos() {
-    ifstream file("datos.json");
-    if (!file.is_open()) {
-        // Si el archivo no existe, creamos uno vacío
-        productosDisponibles = {};
-        facturas = {};
-        guardarDatos();
-        return;
-    }
+// Función para verificar que las tablas existan
+void verificarTablas(connection& C) {
+    try {
+        work W(C);
 
-// Obtener inventario completo desde la base de datos
+        // Verificar tabla productos_inventario
+        W.exec("SELECT id FROM productos_inventario LIMIT 1");
+
+        // Verificar tabla clientes
+        W.exec("SELECT id FROM clientes LIMIT 1");
+
+        // Verificar tabla clientes_cf
+        W.exec("SELECT id FROM clientes_cf LIMIT 1");
+
+        // Verificar tabla facturas
+        W.exec("SELECT factura_id FROM facturas LIMIT 1");
+
+        // Verificar tabla pre_detalle_factura
+        W.exec("SELECT id_pre_factura FROM pre_detalle_factura LIMIT 1");
+
+        W.commit();
+    }
+    catch (const exception& e) {
+        cerr << "Error: Una o más tablas no existen en la base de datos. " << e.what() << endl;
+        exit(1);
+    }
+}
+
+// Obtener inventario completo desde la base de datos ordenado por ID
 vector<Producto> obtenerInventario(connection& C) {
     vector<Producto> inventario;
     try {
         work W(C);
-        result R = W.exec("SELECT id, nombre, descripcion, precio, existencia FROM productos_inventario ORDER BY nombre");
+        result R = W.exec("SELECT id, nombre, descripcion, precio, existencia FROM productos_inventario ORDER BY id");
 
         for (auto row : R) {
             Producto p;
@@ -116,16 +166,16 @@ vector<Producto> obtenerInventario(connection& C) {
             p.precio = row[3].as<double>();
             p.existencia = row[4].as<int>();
             inventario.push_back(p);
-    }
-        W.commit();
         }
+        W.commit();
+    }
     catch (const exception& e) {
         cerr << "Error al obtener inventario: " << e.what() << endl;
     }
     return inventario;
 }
 
-// Obtener un producto especÃ­fico por ID
+// Obtener un producto específico por ID
 Producto obtenerProductoPorId(connection& C, int id) {
     try {
         work W(C);
@@ -133,7 +183,7 @@ Producto obtenerProductoPorId(connection& C, int id) {
 
         if (R.empty()) {
             throw runtime_error("Producto no encontrado");
-    }
+        }
 
         Producto p;
         auto row = R[0];
@@ -145,7 +195,7 @@ Producto obtenerProductoPorId(connection& C, int id) {
 
         W.commit();
         return p;
-}
+    }
     catch (const exception& e) {
         cerr << "Error al obtener producto: " << e.what() << endl;
         throw;
@@ -165,15 +215,7 @@ bool actualizarExistencias(connection& C, int producto_id, int nueva_existencia)
         cerr << "Error al actualizar existencias: " << e.what() << endl;
         return false;
     }
-    cout << "----------------------------------------" << endl;
-    cout << "Productos:" << endl;
-    cout << setw(20) << left << "Nombre" << setw(10) << "Precio" << setw(10) << "Cantidad" << setw(10) << "Total" << endl;
-    for (const auto& producto : factura.productos) {
-        cout << setw(20) << left << producto.nombre
-            << setw(10) << producto.precio
-            << setw(10) << producto.cantidad
-            << setw(10) << producto.precio * producto.cantidad << endl;
-    }
+}
 
 // Reducir existencias cuando se vende un producto
 bool reducirExistencias(connection& C, int producto_id, int cantidad) {
@@ -184,18 +226,18 @@ bool reducirExistencias(connection& C, int producto_id, int cantidad) {
         result R = W.exec("SELECT existencia FROM productos_inventario WHERE id = " + to_string(producto_id));
         if (R.empty()) {
             throw runtime_error("Producto no encontrado");
-}
+        }
 
         int existencia_actual = R[0][0].as<int>();
         if (existencia_actual < cantidad) {
             throw runtime_error("No hay suficiente existencia");
-    }
+        }
 
         W.exec("UPDATE productos_inventario SET existencia = existencia - " + to_string(cantidad) +
             " WHERE id = " + to_string(producto_id));
         W.commit();
         return true;
-}
+    }
     catch (const exception& e) {
         cerr << "Error al reducir existencias: " << e.what() << endl;
         return false;
@@ -212,42 +254,112 @@ bool agregarProducto(connection& C, const Producto& p) {
         W.exec(query);
         W.commit();
         return true;
-            }
+    }
     catch (const exception& e) {
         cerr << "Error al agregar producto: " << e.what() << endl;
         return false;
     }
-        }
+}
 
-// Mostrar el inventario actual
+// Mostrar el inventario actual ordenado por ID
 void mostrarInventario(const vector<Producto>& inventario) {
     cout << "\n=== INVENTARIO ACTUAL ===" << endl;
     cout << setw(5) << left << "ID"
         << setw(25) << left << "Nombre"
+        << setw(40) << left << "Descripción"
         << setw(10) << right << "Precio"
         << setw(10) << right << "Existencia" << endl;
-    cout << string(50, '-') << endl;
+    cout << string(90, '-') << endl;
 
     for (const auto& p : inventario) {
         cout << setw(5) << left << p.id
             << setw(25) << left << p.nombre
+            << setw(40) << left << (p.descripcion.length() > 35 ? p.descripcion.substr(0, 35) + "..." : p.descripcion)
             << setw(10) << right << fixed << setprecision(2) << p.precio
             << setw(10) << right << p.existencia << endl;
     }
 }
 
-// MenÃº para gestionar el inventario
+// Función para guardar una factura en la base de datos
+bool guardarFactura(connection& C, Factura& factura, const string& nombreCliente, const string& nit = "", const string& direccion = "", const string& dpi = "") {
+    try {
+        work W(C);
+
+        // Insertar cliente (según si tiene NIT o no)
+        int cliente_id = 0;
+        int cf_cliente_id = 0;
+
+        if (factura.requiere_nit) {
+            // Insertar cliente con NIT
+            string query = "INSERT INTO clientes (nombre, apellido, direccion, dpi, nit) VALUES (" +
+                W.quote(nombreCliente) + ", '', " +
+                W.quote(direccion) + ", " +
+                W.quote(dpi) + ", " +
+                W.quote(nit) + ") RETURNING id";
+            result R = W.exec(query);
+            cliente_id = R[0][0].as<int>();
+        }
+        else {
+            // Insertar consumidor final
+            string query = "INSERT INTO clientes_cf (nombre, direccion) VALUES (" +
+                W.quote(nombreCliente) + ", " +
+                W.quote(direccion) + ") RETURNING id";
+            result R = W.exec(query);
+            cf_cliente_id = R[0][0].as<int>();
+        }
+
+        // Insertar factura
+        string factura_query = "INSERT INTO facturas (nombre_empresa, direccion_empresa, nit_empresa, codigo_factura, "
+            "cliente_id, cf_cliente_id, subtotal_sin_iva, subtotal, iva, total, requiere_nit) "
+            "VALUES (" +
+            W.quote(factura.nombreEmpresa) + ", " +
+            W.quote(factura.direccionEmpresa) + ", " +
+            W.quote(factura.nitEmpresa) + ", " +
+            W.quote(factura.codigo) + ", " +
+            (cliente_id > 0 ? to_string(cliente_id) : "NULL") + ", " +
+            (cf_cliente_id > 0 ? to_string(cf_cliente_id) : "NULL") + ", " +
+            to_string(factura.subtotal_sin_iva) + ", " +
+            to_string(factura.subtotal) + ", " +
+            to_string(factura.iva) + ", " +
+            to_string(factura.total) + ", " +
+            (factura.requiere_nit ? "TRUE" : "FALSE") + ") RETURNING factura_id";
+
+        result factura_res = W.exec(factura_query);
+        int factura_id = factura_res[0][0].as<int>();
+
+        // Insertar detalles de factura
+        for (const auto& producto : factura.productos) {
+            string detalle_query = "INSERT INTO pre_detalle_factura (factura_id, producto_id, cantidad, precio_unitario, subtotal) "
+                "VALUES (" +
+                to_string(factura_id) + ", " +
+                to_string(producto.id) + ", " +
+                to_string(producto.existencia) + ", " +
+                to_string(producto.precio) + ", " +
+                to_string(producto.precio * producto.existencia) + ")";
+            W.exec(detalle_query);
+        }
+
+        W.commit();
+        return true;
+    }
+    catch (const exception& e) {
+        cerr << "Error al guardar factura: " << e.what() << endl;
+        return false;
+    }
+}
+
+// Menú para gestionar el inventario
 void menuInventario(connection& C) {
     int opcion;
     do {
         limpiarPantalla();
-        cout << "=== GESTIÃ“N DE INVENTARIO ===" << endl;
+        cout << "=== GESTIÓN DE INVENTARIO ===" << endl;
         cout << "1. Ver inventario completo" << endl;
         cout << "2. Buscar producto por ID" << endl;
         cout << "3. Agregar nuevo producto" << endl;
         cout << "4. Actualizar existencias" << endl;
-        cout << "5. Volver al menÃº principal" << endl;
-        cout << "Seleccione una opciÃ³n: ";
+        cout << "5. Volver al menú principal" << endl;
+        cout << "Seleccione una opción: ";
         cin >> opcion;
         cin.ignore();
 
@@ -255,8 +367,8 @@ void menuInventario(connection& C) {
         case 1: {
             auto inventario = obtenerInventario(C);
             mostrarInventario(inventario);
-                break;
-            }
+            break;
+        }
         case 2: {
             int id;
             cout << "Ingrese el ID del producto: ";
@@ -268,24 +380,20 @@ void menuInventario(connection& C) {
                 cout << "\nDetalles del producto:" << endl;
                 cout << "ID: " << p.id << endl;
                 cout << "Nombre: " << p.nombre << endl;
-                cout << "DescripciÃ³n: " << p.descripcion << endl;
+                cout << "Descripción: " << p.descripcion << endl;
                 cout << "Precio: " << fixed << setprecision(2) << p.precio << endl;
                 cout << "Existencia: " << p.existencia << endl;
             }
             catch (const exception& e) {
                 cerr << "Error: " << e.what() << endl;
-        }
-        case 2: {
-            if (factura.productos.empty()) {
-                cout << "------------------------------------------------" << endl;
-                cout << "No hay productos para eliminar." << endl;
-                break;
             }
+            break;
+        }
         case 3: {
             Producto nuevo;
             cout << "Nombre del producto: ";
             getline(cin, nuevo.nombre);
-            cout << "DescripciÃ³n: ";
+            cout << "Descripción: ";
             getline(cin, nuevo.descripcion);
             cout << "Precio: ";
             cin >> nuevo.precio;
@@ -299,8 +407,8 @@ void menuInventario(connection& C) {
             else {
                 cout << "Error al agregar el producto" << endl;
             }
-                break;
-            }
+            break;
+        }
         case 4: {
             int id, nueva_existencia;
             cout << "ID del producto a actualizar: ";
@@ -311,33 +419,16 @@ void menuInventario(connection& C) {
 
             if (actualizarExistencias(C, id, nueva_existencia)) {
                 cout << "Existencias actualizadas correctamente!" << endl;
-                }
+            }
             else {
                 cout << "Error al actualizar existencias" << endl;
             }
-
-            // Eliminar el producto de la factura
-            factura.productos.erase(factura.productos.begin() + idEliminar - 1);
-            calcularTotales(factura);
             break;
         }
-        case 3: {
-            factura.codigo = "FAC-" + to_string(facturas.size() + 1);
-            facturas.push_back(factura);
-            guardarDatos(); // Guardar datos después de emitir la factura
-            cout << "--------------------------------------" << endl;
-            cout << "Factura emitida con codigo: " << factura.codigo << endl;
+        case 5:
             return;
-        }
-        case 4: {
-            devolverProductosAlInventario(factura);
-            guardarDatos(); // Guardar datos después de cancelar la factura
-            cout << "------------------------------------------------------------------" << endl;
-            cout << "Factura cancelada. Los productos han sido devueltos al inventario." << endl;
-            return;
-        }
         default:
-            cout << "OpciÃ³n no vÃ¡lida!" << endl;
+            cout << "Opción no válida!" << endl;
         }
 
         cout << "\nPresione Enter para continuar...";
@@ -345,7 +436,7 @@ void menuInventario(connection& C) {
     } while (true);
 }
 
-// FunciÃ³n para emitir una nueva factura
+// Función para emitir una nueva factura
 void emitirFactura(connection& C) {
     limpiarPantalla();
     auto inventario = obtenerInventario(C);
@@ -357,19 +448,37 @@ void emitirFactura(connection& C) {
     factura.cliente_id = 0;
     factura.cf_cliente_id = 0;
 
-    // SelecciÃ³n de cliente (simplificado para el ejemplo)
+    // Selección de cliente
     cout << "=== DATOS DEL CLIENTE ===" << endl;
     cout << "Nombre del cliente: ";
     string nombreCliente;
     getline(cin, nombreCliente);
 
+    cout << "Dirección: ";
+    string direccion;
+    getline(cin, direccion);
+
     cout << "NIT (deje en blanco para consumidor final): ";
     string nit;
     getline(cin, nit);
 
+    string dpi;
     factura.requiere_nit = !nit.empty();
 
-    // SelecciÃ³n de productos
+    if (factura.requiere_nit) {
+        cout << "DPI (13 dígitos): ";
+        getline(cin, dpi);
+
+        // Validar que el DPI tenga 13 dígitos
+        if (dpi.length() != 13 || !all_of(dpi.begin(), dpi.end(), ::isdigit)) {
+            cout << "Error: El DPI debe tener exactamente 13 dígitos numéricos." << endl;
+            cout << "\nPresione Enter para continuar...";
+            cin.ignore();
+            return;
+        }
+    }
+
+    // Selección de productos
     char continuar;
     do {
         limpiarPantalla();
@@ -383,14 +492,15 @@ void emitirFactura(connection& C) {
 
         cout << "Cantidad: ";
         cin >> cantidad;
+        cin.ignore();
 
         try {
             Producto p = obtenerProductoPorId(C, producto_id);
 
             if (p.existencia < cantidad) {
                 cout << "No hay suficiente existencia. Disponible: " << p.existencia << endl;
-            continue;
-        }
+                continue;
+            }
 
             p.existencia = cantidad;
             factura.productos.push_back(p);
@@ -398,30 +508,12 @@ void emitirFactura(connection& C) {
             // Reducir existencias en la base de datos
             if (reducirExistencias(C, producto_id, cantidad)) {
                 cout << "Producto agregado a la factura" << endl;
-    }
-    else {
-        // Preguntar si desea agregar NIT para facturas menores a 2499
-        char opcionNIT;
-        cout << "---------------------------------------------------------" << endl;
-        cout << "El monto total es menor a Q2499. Desea:" << endl;
-        cout << "1. Agregar NIT (ingrese 'n')" << endl;
-        cout << "2. Usar CF - Consumidor Final (ingrese 'c')" << endl;
-        cout << "Seleccione una opcion (n/c): ";
-        cin >> opcionNIT;
-        cin.ignore();
+            }
 
-        if (opcionNIT == 'n' || opcionNIT == 'N') {
-            cout << "Ingrese el NIT del cliente: ";
-            getline(cin, factura.cliente.nit);
-            factura.requiereNIT = true;
-        }
-        else {
-            factura.cliente.nit = "CF";
-            factura.requiereNIT = false;
         }
         catch (const exception& e) {
             cerr << "Error: " << e.what() << endl;
-    }
+        }
 
         cout << "\nDesea agregar otro producto? (s/n): ";
         cin >> continuar;
@@ -429,13 +521,9 @@ void emitirFactura(connection& C) {
     } while (continuar == 's' || continuar == 'S');
 
     if (factura.productos.empty()) {
-        cout << "Factura vacÃ­a, no se puede emitir" << endl;
-            return;
-        }
+        cout << "Factura vacía, no se puede emitir" << endl;
+        return;
     }
-
-    cout << "Factura no encontrada." << endl;
-}
 
     // Calcular totales
     factura.subtotal = 0;
@@ -446,53 +534,68 @@ void emitirFactura(connection& C) {
     factura.iva = factura.subtotal_sin_iva * 0.12;
     factura.total = factura.subtotal;
 
-    // Generar cÃ³digo de factura
-    factura.codigo = "FAC-" + to_string(time(nullptr));
+    // Generar código de factura más único
+    srand(time(nullptr));
+    factura.codigo = "FAC-" + to_string(time(nullptr)) + "-" + to_string(rand() % 1000);
 
     // Mostrar resumen
     limpiarPantalla();
     cout << "\n=== RESUMEN DE FACTURA ===" << endl;
-    cout << "Cliente: " << nombreCliente << endl;
+    cout << "Empresa: " << factura.nombreEmpresa << endl;
+    cout << "Dirección: " << factura.direccionEmpresa << endl;
+    cout << "NIT: " << factura.nitEmpresa << endl;
+    cout << "Código de factura: " << factura.codigo << endl;
+    cout << "\nCliente: " << nombreCliente << endl;
+    cout << "Dirección: " << direccion << endl;
+
     if (factura.requiere_nit) {
         cout << "NIT: " << nit << endl;
+        cout << "DPI: " << dpi << endl;
     }
     else {
         cout << "Consumidor Final" << endl;
-}
+    }
 
     cout << "\nProductos:" << endl;
-    cout << setw(25) << left << "Nombre"
+    cout << setw(5) << left << "ID"
+        << setw(25) << left << "Nombre"
         << setw(10) << right << "Cantidad"
         << setw(15) << right << "Precio"
         << setw(15) << right << "Subtotal" << endl;
-    cout << string(65, '-') << endl;
+    cout << string(70, '-') << endl;
 
     for (const auto& p : factura.productos) {
-        cout << setw(25) << left << p.nombre
+        cout << setw(5) << left << p.id
+            << setw(25) << left << p.nombre
             << setw(10) << right << p.existencia
             << setw(15) << right << fixed << setprecision(2) << p.precio
             << setw(15) << right << (p.precio * p.existencia) << endl;
     }
 
-    cout << string(65, '-') << endl;
-    cout << setw(50) << right << "Subtotal sin IVA: " << fixed << setprecision(2) << factura.subtotal_sin_iva << endl;
-    cout << setw(50) << right << "IVA (12%): " << fixed << setprecision(2) << factura.iva << endl;
-    cout << setw(50) << right << "TOTAL: " << fixed << setprecision(2) << factura.total << endl;
+    cout << string(70, '-') << endl;
+    cout << setw(55) << right << "Subtotal sin IVA: " << fixed << setprecision(2) << factura.subtotal_sin_iva << endl;
+    cout << setw(55) << right << "IVA (12%): " << fixed << setprecision(2) << factura.iva << endl;
+    cout << setw(55) << right << "TOTAL: " << fixed << setprecision(2) << factura.total << endl;
 
-    // AquÃ­ deberÃ­as implementar la inserciÃ³n en las tablas facturas y pre_detalle_factura
-    cout << "\nFactura generada con cÃ³digo: " << factura.codigo << endl;
+    // Guardar la factura en la base de datos
+    if (guardarFactura(C, factura, nombreCliente, nit, direccion, dpi)) {
+        cout << "\nFactura guardada en la base de datos con código: " << factura.codigo << endl;
+    }
+    else {
+        cout << "\nError al guardar la factura en la base de datos" << endl;
+    }
 }
 
-// MenÃº principal
+// Menú principal
 void menuPrincipal(connection& C) {
     int opcion;
     do {
         limpiarPantalla();
-        cout << "=== SISTEMA DE FACTURACIÃ“N ===" << endl;
-        cout << "1. GestiÃ³n de Inventario" << endl;
+        cout << "=== SISTEMA DE FACTURACIÓN ===" << endl;
+        cout << "1. Gestión de Inventario" << endl;
         cout << "2. Emitir Factura" << endl;
         cout << "3. Salir" << endl;
-        cout << "Seleccione una opciÃ³n: ";
+        cout << "Seleccione una opción: ";
         cin >> opcion;
         cin.ignore();
 
@@ -507,7 +610,7 @@ void menuPrincipal(connection& C) {
             cout << "Saliendo del sistema..." << endl;
             return;
         default:
-            cout << "Opcion no valida. Intente de nuevo." << endl;
+            cout << "Opción no válida!" << endl;
         }
 
         cout << "\nPresione Enter para continuar...";
@@ -520,6 +623,7 @@ int main() {
 
     try {
         connection C = conectarDB();
+        verificarTablas(C);  // Verificar que todas las tablas existan
         menuPrincipal(C);
     }
     catch (const exception& e) {

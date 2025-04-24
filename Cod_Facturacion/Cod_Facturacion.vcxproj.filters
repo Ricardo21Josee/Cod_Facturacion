@@ -20,10 +20,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="datos.json" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="json.hpp">
+    <ClInclude Include="..\..\..\..\..\..\Program Files\PostgreSQL\16\include\libpq-fe.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
