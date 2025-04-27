@@ -107,7 +107,7 @@ connection conectarDB() {
 
         connection C(conn_str);
         if (C.is_open()) {
-            cout << "Conexión exitosa a PostgreSQL" << endl;
+            cout << "Conexióon exitosa a PostgreSQL" << endl;
             return C;
         }
         throw runtime_error("No se pudo conectar a la base de datos");
@@ -353,13 +353,13 @@ void menuInventario(connection& C) {
     int opcion;
     do {
         limpiarPantalla();
-        cout << "=== GESTIÓN DE INVENTARIO ===" << endl;
+        cout << "=== GESTION DE INVENTARIO ===" << endl;
         cout << "1. Ver inventario completo" << endl;
         cout << "2. Buscar producto por ID" << endl;
         cout << "3. Agregar nuevo producto" << endl;
         cout << "4. Actualizar existencias" << endl;
-        cout << "5. Volver al menú principal" << endl;
-        cout << "Seleccione una opción: ";
+        cout << "5. Volver al menu principal" << endl;
+        cout << "Seleccione una opcion: ";
         cin >> opcion;
         cin.ignore();
 
@@ -380,7 +380,7 @@ void menuInventario(connection& C) {
                 cout << "\nDetalles del producto:" << endl;
                 cout << "ID: " << p.id << endl;
                 cout << "Nombre: " << p.nombre << endl;
-                cout << "Descripción: " << p.descripcion << endl;
+                cout << "Descripcion: " << p.descripcion << endl;
                 cout << "Precio: " << fixed << setprecision(2) << p.precio << endl;
                 cout << "Existencia: " << p.existencia << endl;
             }
@@ -393,7 +393,7 @@ void menuInventario(connection& C) {
             Producto nuevo;
             cout << "Nombre del producto: ";
             getline(cin, nuevo.nombre);
-            cout << "Descripción: ";
+            cout << "Descripcion: ";
             getline(cin, nuevo.descripcion);
             cout << "Precio: ";
             cin >> nuevo.precio;
@@ -428,7 +428,7 @@ void menuInventario(connection& C) {
         case 5:
             return;
         default:
-            cout << "Opción no válida!" << endl;
+            cout << "Opcion no valida!" << endl;
         }
 
         cout << "\nPresione Enter para continuar...";
@@ -454,7 +454,7 @@ void emitirFactura(connection& C) {
     string nombreCliente;
     getline(cin, nombreCliente);
 
-    cout << "Dirección: ";
+    cout << "Direccion: ";
     string direccion;
     getline(cin, direccion);
 
@@ -471,7 +471,7 @@ void emitirFactura(connection& C) {
 
         // Validar que el DPI tenga 13 dígitos
         if (dpi.length() != 13 || !all_of(dpi.begin(), dpi.end(), ::isdigit)) {
-            cout << "Error: El DPI debe tener exactamente 13 dígitos numéricos." << endl;
+            cout << "Error: El DPI debe tener exactamente 13 digitos numericos." << endl;
             cout << "\nPresione Enter para continuar...";
             cin.ignore();
             return;
@@ -521,7 +521,7 @@ void emitirFactura(connection& C) {
     } while (continuar == 's' || continuar == 'S');
 
     if (factura.productos.empty()) {
-        cout << "Factura vacía, no se puede emitir" << endl;
+        cout << "Factura vacia, no se puede emitir" << endl;
         return;
     }
 
@@ -542,11 +542,11 @@ void emitirFactura(connection& C) {
     limpiarPantalla();
     cout << "\n=== RESUMEN DE FACTURA ===" << endl;
     cout << "Empresa: " << factura.nombreEmpresa << endl;
-    cout << "Dirección: " << factura.direccionEmpresa << endl;
+    cout << "Direccion: " << factura.direccionEmpresa << endl;
     cout << "NIT: " << factura.nitEmpresa << endl;
-    cout << "Código de factura: " << factura.codigo << endl;
+    cout << "Codigo de factura: " << factura.codigo << endl;
     cout << "\nCliente: " << nombreCliente << endl;
-    cout << "Dirección: " << direccion << endl;
+    cout << "Direccion: " << direccion << endl;
 
     if (factura.requiere_nit) {
         cout << "NIT: " << nit << endl;
@@ -591,11 +591,11 @@ void menuPrincipal(connection& C) {
     int opcion;
     do {
         limpiarPantalla();
-        cout << "=== SISTEMA DE FACTURACIÓN ===" << endl;
-        cout << "1. Gestión de Inventario" << endl;
+        cout << "=== SISTEMA DE FACTURACION ===" << endl;
+        cout << "1. Gestion de Inventario" << endl;
         cout << "2. Emitir Factura" << endl;
         cout << "3. Salir" << endl;
-        cout << "Seleccione una opción: ";
+        cout << "Seleccione una opcion: ";
         cin >> opcion;
         cin.ignore();
 
@@ -610,7 +610,7 @@ void menuPrincipal(connection& C) {
             cout << "Saliendo del sistema..." << endl;
             return;
         default:
-            cout << "Opción no válida!" << endl;
+            cout << "Opcion no valida!" << endl;
         }
 
         cout << "\nPresione Enter para continuar...";
