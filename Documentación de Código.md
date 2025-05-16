@@ -1,371 +1,436 @@
-<h1 align="center"><b>Sistema de Facturación y Control de Inventario con almacenamiento en JSON</b><img src="https://media.giphy.com/media/hvRJCLFzcasrR4ia7z/giphy.gif" width="35"></h1>
-    <br>
-    <h1>Acerca del Código</h1>
-    <p>Este programa en C++ es un <strong>Sistema de Punto de Venta (POS)</strong> diseñado para TecnoShop GT, un negocio minorista en Guatemala. Proporciona capacidades completas de gestión de inventario, facturación y reportes de ventas con persistencia de datos en JSON.</p>
+<h1 align="center"><b>Sistema de Facturación y Control de Inventario con PostgreSQL</b><img src="https://media.giphy.com/media/hvRJCLFzcasrR4ia7z/giphy.gif" width="35"></h1>
+<br>
 
-  <div class="section">
-        <h2>Visión General del Sistema</h2>
-        <p>El sistema POS consta de varios componentes clave:</p>
-        <ul>
-            <li>Gestión de inventario de productos</li>
-            <li>Generación de facturas con cálculos de impuestos</li>
-            <li>Manejo de información de clientes</li>
-            <li>Reportes de ventas y análisis</li>
-            <li>Persistencia de datos usando archivos JSON</li>
-        </ul>
-        
-  <h3>Características Principales</h3>
-        <ul>
-            <li>Cálculo automático de IVA (12%)</li>
-            <li>Aplicación de requisito de NIT para facturas mayores a Q2499</li>
-            <li>Seguimiento de inventario con actualización de stock</li>
-            <li>Múltiples opciones de ordenamiento de facturas</li>
-            <li>Reportes resumidos de ventas</li>
-            <li>Compatibilidad multiplataforma (Windows/Linux)</li>
-        </ul>
-    </div>
 <div class="section">
-        <h2>Estructuras de Datos</h2>
-        
-  <h3>Estructura de Producto</h3>
-        <div class="code-header">Estructura Producto</div>
-        <pre class="code-block"><code>struct Producto {
-    string nombre;
-    string descripcion;
-    double precio = 0;
-    int cantidad = 0;
+    <h2>Descripción General</h2>
+    <p>Este sistema de facturación y control de inventario está desarrollado en C++ moderno (C++17) y utiliza PostgreSQL como sistema de gestión de base de datos. Está diseñado para Tienda Facturación DB, proporcionando gestión completa de inventario, generación de facturas y seguimiento de clientes.</p>
+    
+<h3>Características Principales</h3>
+    <ul>
+        <li>Conexión robusta a base de datos PostgreSQL</li>
+        <li>Gestión completa de inventario</li>
+        <li>Generación de facturas con cálculo automático de IVA (12%)</li>
+        <li>Diferencia entre clientes con NIT y consumidores finales</li>
+        <li>Validación de datos y manejo de errores</li>
+        <li>Interfaz de consola intuitiva</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Estructuras de Datos</h2>
+    
+<h3>Estructura Producto</h3>
+    <pre><code>struct Producto {
+    int id = 0;
+    string nombre = "";
+    string descripcion = "";
+    double precio = 0.0;
     int existencia = 0;
 };</code></pre>
-        <table>
-            <tr>
-                <th>Campo</th>
-                <th>Tipo</th>
-                <th>Descripción</th>
-            </tr>
-            <tr>
-                <td>nombre</td>
-                <td>string</td>
-                <td>Nombre del producto</td>
-            </tr>
-            <tr>
-                <td>descripcion</td>
-                <td>string</td>
-                <td>Descripción del producto</td>
-            </tr>
-            <tr>
-                <td>precio</td>
-                <td>double</td>
-                <td>Precio unitario del producto</td>
-            </tr>
-            <tr>
-                <td>cantidad</td>
-                <td>int</td>
-                <td>Cantidad en la transacción actual (valor por defecto: 0)</td>
-            </tr>
-            <tr>
-                <td>existencia</td>
-                <td>int</td>
-                <td>Cantidad actual en stock (valor por defecto: 0)</td>
-            </tr>
-        </table>
+    <table>
+        <tr>
+            <th>Campo</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+        </tr>
+        <tr>
+            <td>id</td>
+            <td>int</td>
+            <td>Identificador único del producto</td>
+        </tr>
+        <tr>
+            <td>nombre</td>
+            <td>string</td>
+            <td>Nombre del producto</td>
+        </tr>
+        <tr>
+            <td>descripcion</td>
+            <td>string</td>
+            <td>Descripción detallada del producto</td>
+        </tr>
+        <tr>
+            <td>precio</td>
+            <td>double</td>
+            <td>Precio unitario del producto</td>
+        </tr>
+        <tr>
+            <td>existencia</td>
+            <td>int</td>
+            <td>Cantidad disponible en inventario</td>
+        </tr>
+    </table>
 
-  <h3>Estructura de Cliente</h3>
-        <div class="code-header">Estructura Cliente</div>
-        <pre class="code-block"><code>struct Cliente {
-    string nombre;
-    string nit;
+<h3>Estructura Cliente</h3>
+    <pre><code>struct Cliente {
+    int id = 0;
+    string nombre = "";
+    string apellido = "";
+    string direccion = "";
+    string dpi = "";
+    string nit = "";
 };</code></pre>
-        <table>
-            <tr>
-                <th>Campo</th>
-                <th>Tipo</th>
-                <th>Descripción</th>
-            </tr>
-            <tr>
-                <td>nombre</td>
-                <td>string</td>
-                <td>Nombre del cliente</td>
-            </tr>
-            <tr>
-                <td>nit</td>
-                <td>string</td>
-                <td>Número de identificación tributaria (NIT) del cliente</td>
-            </tr>
-        </table>
+    <table>
+        <tr>
+            <th>Campo</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+        </tr>
+        <tr>
+            <td>id</td>
+            <td>int</td>
+            <td>Identificador único del cliente</td>
+        </tr>
+        <tr>
+            <td>nombre</td>
+            <td>string</td>
+            <td>Nombre del cliente</td>
+        </tr>
+        <tr>
+            <td>apellido</td>
+            <td>string</td>
+            <td>Apellido del cliente</td>
+        </tr>
+        <tr>
+            <td>direccion</td>
+            <td>string</td>
+            <td>Dirección del cliente</td>
+        </tr>
+        <tr>
+            <td>dpi</td>
+            <td>string</td>
+            <td>Documento Personal de Identificación (13 dígitos)</td>
+        </tr>
+        <tr>
+            <td>nit</td>
+            <td>string</td>
+            <td>Número de Identificación Tributaria</td>
+        </tr>
+    </table>
 
-  <h3>Estructura de Factura</h3>
-        <div class="code-header">Estructura Factura</div>
-        <pre class="code-block"><code>struct Factura {
-    string codigo;
-    string nombreEmpresa;
-    string direccionEmpresa;
-    string nitEmpresa;
-    Cliente cliente;
+<h3>Estructura ClienteCF (Consumidor Final)</h3>
+    <pre><code>struct ClienteCF {
+    int id = 0;
+    string nombre = "";
+    string direccion = "";
+};</code></pre>
+    <table>
+        <tr>
+            <th>Campo</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+        </tr>
+        <tr>
+            <td>id</td>
+            <td>int</td>
+            <td>Identificador único del consumidor final</td>
+        </tr>
+        <tr>
+            <td>nombre</td>
+            <td>string</td>
+            <td>Nombre del consumidor final</td>
+        </tr>
+        <tr>
+            <td>direccion</td>
+            <td>string</td>
+            <td>Dirección del consumidor final</td>
+        </tr>
+    </table>
+
+<h3>Estructura Factura</h3>
+    <pre><code>struct Factura {
+    int id = 0;
+    string codigo = "";
+    string nombreEmpresa = "";
+    string direccionEmpresa = "";
+    string nitEmpresa = "";
+    int cliente_id = 0;
+    int cf_cliente_id = 0;
+    double subtotal_sin_iva = 0.0;
+    double subtotal = 0.0;
+    double iva = 0.0;
+    double total = 0.0;
+    bool requiere_nit = false;
     vector&lt;Producto&gt; productos;
-    double siva = 0;
-    double subtotal = 0;
-    double iva = 0;
-    double total = 0;
-    bool requiereNIT = false;
 };</code></pre>
-        <table>
-            <tr>
-                <th>Campo</th>
-                <th>Tipo</th>
-                <th>Descripción</th>
-            </tr>
-            <tr>
-                <td>codigo</td>
-                <td>string</td>
-                <td>Código único de factura (ej. "FAC-1")</td>
-            </tr>
-            <tr>
-                <td>nombreEmpresa</td>
-                <td>string</td>
-                <td>Nombre de la empresa (constante: "TecnoShop GT")</td>
-            </tr>
-            <tr>
-                <td>direccionEmpresa</td>
-                <td>string</td>
-                <td>Dirección de la empresa (constante)</td>
-            </tr>
-            <tr>
-                <td>nitEmpresa</td>
-                <td>string</td>
-                <td>NIT de la empresa (constante: "123456-7")</td>
-            </tr>
-            <tr>
-                <td>cliente</td>
-                <td>Cliente</td>
-                <td>Estructura con información del cliente</td>
-            </tr>
-            <tr>
-                <td>productos</td>
-                <td>vector&lt;Producto&gt;</td>
-                <td>Lista de productos en la factura</td>
-            </tr>
-            <tr>
-                <td>siva</td>
-                <td>double</td>
-                <td>Subtotal sin IVA (calculado)</td>
-            </tr>
-            <tr>
-                <td>subtotal</td>
-                <td>double</td>
-                <td>Total antes de IVA (calculado)</td>
-            </tr>
-            <tr>
-                <td>iva</td>
-                <td>double</td>
-                <td>Monto de IVA (12% de siva)</td>
-            </tr>
-            <tr>
-                <td>total</td>
-                <td>double</td>
-                <td>Monto final a pagar (subtotal + iva)</td>
-            </tr>
-            <tr>
-                <td>requiereNIT</td>
-                <td>bool</td>
-                <td>Indicador de requisito de NIT (true si total > 2499)</td>
-            </tr>
-        </table>
-    </div>
-
-  <div class="section">
-        <h2>Funciones Principales</h2>
-        
-  <h3>Persistencia de Datos</h3>
-        <p>El sistema usa archivos JSON para almacenamiento de datos con la biblioteca nlohmann/json.</p>
-        
-  <h4>guardarDatos()</h4>
-        <p>Guarda todos los datos del sistema en el archivo "datos.json":</p>
-        <ul>
-            <li>Convierte datos de productos y facturas a formato JSON</li>
-            <li>Crea un objeto JSON estructurado con arrays para productos y facturas</li>
-            <li>Escribe en el archivo con formato legible (indentación de 4 espacios)</li>
-        </ul>
-        
-  <h4>cargarDatos()</h4>
-        <p>Carga los datos del sistema desde "datos.json":</p>
-        <ul>
-            <li>Crea un nuevo archivo vacío si no existe</li>
-            <li>Interpreta los datos JSON en estructuras de C++</li>
-            <li>Llena los vectores globales productosDisponibles y facturas</li>
-        </ul>
-        
-  <h3>Funciones de Utilidad</h3>
-        
-  <h4>limpiarPantalla()</h4>
-        <p>Limpia la pantalla de la consola con comandos específicos para cada plataforma:</p>
-        <ul>
-            <li>Usa "cls" en Windows</li>
-            <li>Usa "clear" en sistemas tipo Unix</li>
-        </ul>
-        
-  <h4>calcularTotales(Factura& factura)</h4>
-        <p>Calcula los valores financieros de la factura:</p>
-        <ul>
-            <li>Subtotal: Suma de todos los precios de productos × cantidades</li>
-            <li>siva: Subtotal dividido por 1.12 (monto antes de IVA)</li>
-            <li>iva: 12% de siva</li>
-            <li>total: siva + iva</li>
-            <li>Establece el flag requiereNIT si el total excede 2499</li>
-        </ul>
-        
-  <h4>devolverProductosAlInventario(Factura& factura)</h4>
-        <p>Devuelve los productos de una factura cancelada al inventario:</p>
-        <ul>
-            <li>Empareja productos por nombre</li>
-            <li>Incrementa el campo existencia por cada producto devuelto</li>
-        </ul>
-    </div>
-
-  <div class="section">
-        <h2>Componentes de la Interfaz de Usuario</h2>
-        
-  <h3>Menú Principal</h3>
-        <p>Punto de entrada de la aplicación con estas opciones:</p>
-        <ol>
-            <li><strong>Emitir Factura</strong>: Crear una nueva factura</li>
-            <li><strong>Buscar Factura</strong>: Buscar una factura existente</li>
-            <li><strong>Mostrar Todas las Facturas</strong>: Mostrar todas las facturas con opciones de ordenamiento</li>
-            <li><strong>Mostrar Estado de Cuenta</strong>: Mostrar resumen de ventas</li>
-            <li><strong>Mostrar Inventario</strong>: Mostrar inventario actual de productos</li>
-            <li><strong>Agregar productos al inventario</strong>: Añadir nuevos productos</li>
-            <li><strong>Salir</strong>: Salir de la aplicación</li>
-        </ol>
-        
-  <h3>Flujo de Creación de Facturas</h3>
-        <ol>
-            <li>Ingresar nombre del cliente</li>
-            <li>Añadir productos por ID con cantidades</li>
-            <li>El sistema verifica disponibilidad en stock</li>
-            <li>Opción para añadir más productos</li>
-            <li>Verificación automática de requisito de NIT para totales > 2499</li>
-            <li>Menú de edición de factura con opciones para:
-                <ul>
-                    <li>Añadir más productos</li>
-                    <li>Eliminar productos</li>
-                    <li>Finalizar factura</li>
-                    <li>Cancelar factura (devuelve productos al inventario)</li>
-                </ul>
-            </li>
-        </ol>
-        
-  <h3>Funciones de Visualización</h3>
-        
-  <h4>mostrarProductosDisponibles()</h4>
-        <p>Muestra los productos disponibles en una tabla formateada con columnas:</p>
-        <ul>
-            <li>ID (índice basado en 1)</li>
-            <li>Nombre</li>
-            <li>Descripción</li>
-            <li>Precio</li>
-            <li>Stock (existencia)</li>
-        </ul>
-        
-  <h4>mostrarFactura(const Factura& factura)</h4>
-        <p>Muestra información completa de la factura incluyendo:</p>
-        <ul>
-            <li>Información de la empresa</li>
-            <li>Detalles del cliente</li>
-            <li>Lista de productos con cantidades y totales</li>
-            <li>Desglose financiero (subtotales, IVA, total)</li>
-            <li>Indicación de NIT/CF</li>
-        </ul>
-    </div>
+    <table>
+        <tr>
+            <th>Campo</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+        </tr>
+        <tr>
+            <td>id</td>
+            <td>int</td>
+            <td>Identificador único de la factura</td>
+        </tr>
+        <tr>
+            <td>codigo</td>
+            <td>string</td>
+            <td>Código único de factura generado automáticamente</td>
+        </tr>
+        <tr>
+            <td>nombreEmpresa</td>
+            <td>string</td>
+            <td>Nombre de la empresa emisora</td>
+        </tr>
+        <tr>
+            <td>direccionEmpresa</td>
+            <td>string</td>
+            <td>Dirección de la empresa emisora</td>
+        </tr>
+        <tr>
+            <td>nitEmpresa</td>
+            <td>string</td>
+            <td>NIT de la empresa emisora</td>
+        </tr>
+        <tr>
+            <td>cliente_id</td>
+            <td>int</td>
+            <td>ID del cliente (si aplica)</td>
+        </tr>
+        <tr>
+            <td>cf_cliente_id</td>
+            <td>int</td>
+            <td>ID del consumidor final (si aplica)</td>
+        </tr>
+        <tr>
+            <td>subtotal_sin_iva</td>
+            <td>double</td>
+            <td>Subtotal antes de aplicar IVA</td>
+        </tr>
+        <tr>
+            <td>subtotal</td>
+            <td>double</td>
+            <td>Subtotal con IVA incluido</td>
+        </tr>
+        <tr>
+            <td>iva</td>
+            <td>double</td>
+            <td>Monto del IVA calculado (12%)</td>
+        </tr>
+        <tr>
+            <td>total</td>
+            <td>double</td>
+            <td>Total a pagar</td>
+        </tr>
+        <tr>
+            <td>requiere_nit</td>
+            <td>bool</td>
+            <td>Indica si la factura requiere NIT</td>
+        </tr>
+        <tr>
+            <td>productos</td>
+            <td>vector&lt;Producto&gt;</td>
+            <td>Lista de productos incluidos en la factura</td>
+        </tr>
+    </table>
+</div>
 
 <div class="section">
-        <h1 align="center">Guía de Uso</h1>
-        
-  <h3>Primeros Pasos</h3>
-        <ol>
-            <li>Compile el programa con un compilador compatible con C++17</li>
-            <li>Asegúrese que nlohmann/json.hpp esté en su ruta de includes</li>
-            <li>Ejecute el programa</li>
-            <li>El sistema creará un archivo "datos.json" si no existe</li>
-        </ol>
-        
-  <h3>Añadir Productos</h3>
-        <p>Desde el menú principal, seleccione la opción 6 y proporcione:</p>
-        <ul>
-            <li>Nombre del producto</li>
-            <li>Descripción</li>
-            <li>Precio</li>
-            <li>Cantidad inicial en stock</li>
-        </ul>
-        
-  <h3>Crear una Factura</h3>
-        <ol>
-            <li>Seleccione "Emitir Factura" del menú principal</li>
-            <li>Ingrese el nombre del cliente</li>
-            <li>Añada productos por ID y cantidad</li>
-            <li>Continúe añadiendo productos o finalice</li>
-            <li>Proporcione NIT si es requerido o solicitado</li>
-            <li>Use el menú de factura para finalizar o hacer cambios</li>
-        </ol>
-        
-  <h3>Ejemplo de Creación de Factura</h3>
-        <pre>
-1. Seleccione "1. Emitir Factura"
-2. Ingrese nombre del cliente: "Juan Pérez"
-3. Vea la lista de productos y note los IDs:
-   - 1 Laptop  Q5000 (10 en stock)
-   - 2 Mouse   Q150 (25 en stock)
-4. Añada producto 1, cantidad 2
-5. Añada producto 2, cantidad 1
-6. Elija no añadir más productos
-7. El sistema calcula el total (Q10180 + 12% IVA)
-8. Como total > Q2499, ingrese NIT: "12345678-9"
-9. Finalice la factura
-        </pre>
-        
-  <h3>Visualización de Reportes</h3>
-        <p><strong>Todas las Facturas:</strong> Opción 3 con ordenamiento por:
-        <ul>
-            <li>Código de factura</li>
-            <li>Nombre del cliente</li>
-            <li>Monto total</li>
-        </ul>
-        
-  <p><strong>Resumen de Ventas:</strong> Opción 4 muestra:
-        <ul>
-            <li>Lista de todas las facturas con sus totales</li>
-            <li>Total general de todas las ventas</li>
-        </ul>
-    </div>
+    <h2>Funciones Principales</h2>
+    
+<h3>Conexión a la Base de Datos</h3>
+    <h4>conectarDB()</h4>
+    <p>Establece conexión con la base de datos PostgreSQL:</p>
+    <ul>
+        <li>Utiliza parámetros de conexión configurados</li>
+        <li>Maneja errores de conexión</li>
+        <li>Retorna un objeto connection de pqxx</li>
+    </ul>
+    
+<h4>verificarTablas(connection& C)</h4>
+    <p>Verifica que todas las tablas necesarias existan en la base de datos:</p>
+    <ul>
+        <li>productos_inventario</li>
+        <li>clientes</li>
+        <li>clientes_cf</li>
+        <li>facturas</li>
+        <li>pre_detalle_factura</li>
+    </ul>
+    
+<h3>Gestión de Inventario</h3>
+    <h4>obtenerInventario(connection& C)</h4>
+    <p>Recupera todos los productos del inventario ordenados por ID:</p>
+    <ul>
+        <li>Ejecuta consulta SQL</li>
+        <li>Retorna vector de Producto</li>
+    </ul>
+    
+<h4>obtenerProductoPorId(connection& C, int id)</h4>
+    <p>Obtiene un producto específico por su ID:</p>
+    <ul>
+        <li>Lanza excepción si no encuentra el producto</li>
+        <li>Retorna objeto Producto</li>
+    </ul>
+    
+<h4>actualizarExistencias(connection& C, int producto_id, int nueva_existencia)</h4>
+    <p>Actualiza la cantidad en existencia de un producto:</p>
+    <ul>
+        <li>Retorna true si la actualización fue exitosa</li>
+    </ul>
+    
+<h4>reducirExistencias(connection& C, int producto_id, int cantidad)</h4>
+    <p>Reduce la existencia de un producto al venderlo:</p>
+    <ul>
+        <li>Verifica que haya suficiente existencia</li>
+        <li>Retorna true si la operación fue exitosa</li>
+    </ul>
+    
+ <h4>agregarProducto(connection& C, const Producto& p)</h4>
+    <p>Agrega un nuevo producto al inventario:</p>
+    <ul>
+        <li>Retorna true si la inserción fue exitosa</li>
+    </ul>
+    
+<h3>Facturación</h3>
+    <h4>guardarFactura(connection& C, Factura& factura, const string& nombreCliente, const string& nit, const string& direccion, const string& dpi)</h4>
+    <p>Guarda una factura completa en la base de datos:</p>
+    <ul>
+        <li>Inserta cliente según si tiene NIT o es consumidor final</li>
+        <li>Genera registro de factura</li>
+        <li>Guarda detalles de productos facturados</li>
+        <li>Retorna true si la operación fue exitosa</li>
+    </ul>
+    
+<h3>Interfaz de Usuario</h3>
+    <h4>menuInventario(connection& C)</h4>
+    <p>Muestra menú de gestión de inventario con opciones para:</p>
+    <ul>
+        <li>Ver inventario completo</li>
+        <li>Buscar producto por ID</li>
+        <li>Agregar nuevo producto</li>
+        <li>Actualizar existencias</li>
+    </ul>
+    
+<h4>emitirFactura(connection& C)</h4>
+    <p>Guía al usuario a través del proceso de facturación:</p>
+    <ul>
+        <li>Captura datos del cliente</li>
+        <li>Permite seleccionar productos y cantidades</li>
+        <li>Calcula totales automáticamente</li>
+        <li>Genera código único de factura</li>
+        <li>Muestra resumen antes de guardar</li>
+    </ul>
+    
+<h4>menuPrincipal(connection& C)</h4>
+    <p>Muestra el menú principal con opciones para:</p>
+    <ul>
+        <li>Gestión de inventario</li>
+        <li>Emisión de facturas</li>
+        <li>Salir del sistema</li>
+    </ul>
+</div>
 
-  <div class="section">
-        <h2>Notas Importantes</h2>
-        
-  <div class="note">
-            <h4>Persistencia de Datos</h4>
-            <p>El sistema guarda automáticamente los datos en "datos.json" cuando:</p>
-            <ul>
-                <li>Se crea o cancela una factura</li>
-                <li>Se añaden nuevos productos</li>
-                <li>Se sale del programa</li>
-            </ul>
-        </div>
-        
+<div class="section">
+    <h2>Configuración Requerida</h2>
+    
+<h3>Requisitos del Sistema</h3>
+    <ul>
+        <li>Compilador C++17 (g++ 7+, clang 5+, MSVC 2017+)</li>
+        <li>PostgreSQL 9.5+</li>
+        <li>Biblioteca libpqxx 6.0+</li>
+    </ul>
+    
+<h3>Configuración de la Base de Datos</h3>
+    <p>Modificar las constantes al inicio del código según su entorno:</p>
+    <pre><code>const string DB_NAME = "Tienda_Facturacion_DB";
+const string DB_USER = "ricardo";
+const string DB_PASSWORD = "ricgio921";
+const string DB_HOST = "localhost";
+const string DB_PORT = "5432";</code></pre>
+    
+<h3>Estructura de la Base de Datos</h3>
+    <p>El sistema espera las siguientes tablas:</p>
+    <ul>
+        <li><strong>productos_inventario</strong>: Almacena información de productos</li>
+        <li><strong>clientes</strong>: Almacena clientes con NIT</li>
+        <li><strong>clientes_cf</strong>: Almacena consumidores finales</li>
+        <li><strong>facturas</strong>: Registro de facturas emitidas</li>
+        <li><strong>pre_detalle_factura</strong>: Detalle de productos por factura</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Guía de Uso</h2>
+    
+<h3>Compilación y Ejecución</h3>
+    <ol>
+        <li>Compilar con soporte para C++17:
+            <pre>g++ -std=c++17 -o sistema_facturacion main.cpp -lpqxx -lpq</pre>
+        </li>
+        <li>Ejecutar el programa:
+            <pre>./sistema_facturacion</pre>
+        </li>
+    </ol>
+    
+<h3>Flujo de Trabajo</h3>
+    <h4>1. Gestión de Inventario</h4>
+    <ol>
+        <li>Seleccionar "Gestión de Inventario" del menú principal</li>
+        <li>Agregar productos con nombre, descripción, precio y existencia inicial</li>
+        <li>Actualizar existencias según ventas o reposiciones</li>
+    </ol>
+    
+<h4>2. Emisión de Facturas</h4>
+    <ol>
+        <li>Seleccionar "Emitir Factura" del menú principal</li>
+        <li>Ingresar datos del cliente (nombre, dirección)</li>
+        <li>Proporcionar NIT si es requerido (facturas mayores a Q2499)</li>
+        <li>Seleccionar productos y cantidades</li>
+        <li>Revisar resumen y confirmar</li>
+    </ol>
+    
+<h3>Ejemplo de Facturación</h3>
+    <pre>
+1. Seleccionar "2. Emitir Factura"
+2. Ingresar nombre: "María López"
+3. Ingresar dirección: "5ta avenida 8-90 zona 1"
+4. Ingresar NIT: "98765432-1" (requerido para facturas > Q2499)
+5. Ingresar DPI: "1234567890123" (13 dígitos)
+6. Seleccionar productos:
+   - ID 1: Laptop (Q5000) x 2 unidades
+   - ID 3: Mouse (Q150) x 1 unidad
+7. Confirmar factura
+8. Sistema muestra resumen con:
+   - Subtotal: Q10150
+   - IVA (12%): Q1089.29
+   - Total: Q10150
+9. Factura se guarda con código único (ej: FAC-1623456789-456)</pre>
+</div>
+
+<div class="section">
+    <h2>Consideraciones Importantes</h2>
+    
    <div class="warning">
-            <h4>Cumplimiento Tributario</h4>
-            <p>El sistema aplica la recolección de NIT para facturas mayores a Q2499 según lo requiere la ley tributaria guatemalteca. Para facturas menores, los usuarios pueden elegir entre NIT o CF (Consumidor Final).</p>
-        </div>
-        
-  <h3>Consideraciones Técnicas</h3>
+        <h4>Cumplimiento Tributario</h4>
+        <p>El sistema valida que facturas superiores a Q2499 incluyan NIT del cliente, cumpliendo con las regulaciones fiscales de Guatemala.</p>
+    </div>
+    
+<div class="note">
+        <h4>Seguridad de Datos</h4>
+        <p>Toda la información se almacena en PostgreSQL, proporcionando:</p>
         <ul>
-            <li>El emparejamiento de productos se hace por nombre - asegure nombres únicos</li>
-            <li>Los códigos de factura son secuenciales (FAC-1, FAC-2, etc.)</li>
-            <li>El sistema usa la tasa de IVA guatemalteca del 12%</li>
-            <li>Todos los valores monetarios están en Quetzales (Q)</li>
+            <li>Integridad de datos</li>
+            <li>Transacciones ACID</li>
+            <li>Respaldo y recuperación</li>
         </ul>
     </div>
+    
+<h3>Recomendaciones</h3>
+    <ul>
+        <li>Realizar respaldos periódicos de la base de datos</li>
+        <li>Configurar usuarios con los permisos adecuados</li>
+        <li>Implementar red privada para la conexión a la base de datos en entornos productivos</li>
+    </ul>
+</div>
 
-  <div class="section">
-        <h2>Conclusión</h2>
-        <p>
-            Futuras mejoras podrían incluir soporte para escaneo de códigos de barras, autenticación de usuarios, y características de reportes más detallados.
-        </p>
-    </div>
+<div class="section">
+    <h2>Posibles Mejoras</h2>
+    <ul>
+        <li>Implementar autenticación de usuarios</li>
+        <li>Agregar reportes detallados de ventas</li>
+        <li>Implementar búsqueda avanzada de facturas</li>
+        <li>Desarrollar interfaz gráfica</li>
+        <li>Agregar soporte para múltiples sucursales</li>
+    </ul>
+</div>
