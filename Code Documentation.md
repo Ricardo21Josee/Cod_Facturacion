@@ -1,7 +1,6 @@
 <h1 align="center"><b>Billing and Inventory Control System with PostgreSQL</b><img src="https://media.giphy.com/media/hvRJCLFzcasrR4ia7z/giphy.gif" width="35"></h1>
 <br>
 
-
 <div class="section">
     <h2>Overview</h2>
     <p>This billing and inventory control system is developed in modern C++ (C++17) and uses PostgreSQL as its database management system. Designed for "Tienda Facturación DB", it provides complete inventory management, invoice generation, and customer tracking.</p>
