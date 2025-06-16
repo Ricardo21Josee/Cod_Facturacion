@@ -131,7 +131,7 @@ connection conectarDB() {
     }
 }
 
-// FunciÃ³n para verificar que las tablas existan
+// Funcion para verificar que las tablas existan
 void verificarTablas(connection& C) {
     try {
         work W(C);
@@ -183,7 +183,7 @@ vector<Producto> obtenerInventario(connection& C) {
     return inventario;
 }
 
-// Obtener un producto especÃ­fico por ID
+// Obtener un producto especi­fico por ID
 Producto obtenerProductoPorId(connection& C, int id) {
     try {
         work W(C);
@@ -356,7 +356,7 @@ bool guardarFactura(connection& C, Factura& factura, const string& nombreCliente
     }
 }
 
-// MenÃº para gestionar el inventario
+// Menu para gestionar el inventario
 void menuInventario(connection& C) {
     int opcion;
     do {
@@ -594,7 +594,7 @@ void emitirFactura(connection& C) {
     }
 }
 
-// MenÃº principal
+// Menu principal
 void menuPrincipal(connection& C) {
     int opcion;
     do {
