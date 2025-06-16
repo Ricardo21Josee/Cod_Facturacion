@@ -1,6 +1,7 @@
 <h1 align="center"><b>Sistema de Facturación y Control de Inventario con PostgreSQL</b><img src="https://media.giphy.com/media/hvRJCLFzcasrR4ia7z/giphy.gif" width="35"></h1>
 <br>
 
+
 <div class="section">
     <h2>Descripción General</h2>
     <p>Este sistema de facturación y control de inventario está desarrollado en C++ moderno (C++17) y utiliza PostgreSQL como sistema de gestión de base de datos. Está diseñado para Tienda Facturación DB, proporcionando gestión completa de inventario, generación de facturas y seguimiento de clientes.</p>
